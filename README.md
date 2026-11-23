@@ -1550,24 +1550,14 @@ either needs this import. See
 ### `microtags/preact`
 
 Use a microtags component inside a Preact app, rendered on the server
-and hydrated in the browser, or rendered client-only. `toPreact(El,
-{ events })` takes an element class and returns a Preact component that
-renders the host tag. Preact owns the host and its attributes, and the
+and hydrated in the browser, or rendered clientside-only.
+`toPreact(El, { events })` takes an element class and returns a Preact component
+that renders the host tag. Preact owns the host and its attributes, and the
 element owns the host's children. See
 [ADR-010](./docs/adr/ADR-010-preact-adapter-ownership-split.md).
 
-```ts
-import { toPreact } from 'microtags/preact'
-import { NumberInput } from './number-input.js'
-
-// callback prop name -> DOM event name
-export const PreactNumberInput = toPreact(NumberInput, {
-    events: { onChange: 'number-input:change' },
-})
-```
-
-The component takes the element's declared props (typed from the
-class), one callback prop per entry in `events`, and `class`, `id`,
+The component takes the element's declared props (typed from the class),
+one callback prop per entry in `events`, and `class`, `id`,
 `aria-*` and `data-*` props, which pass through to the host.
 
 **Server render, then hydrate.** On the server, the adapter fills the
@@ -1577,12 +1567,31 @@ a variant of the component that keeps its `.render` link; a class with
 no render link throws an error naming its tag.
 
 ```ts
+import { toPreact } from 'microtags/preact'
+import { NumberInput } from './number-input.js'  // the microtags web component
+
+// callback prop name -> DOM event name
+export const PreactNumberInput = toPreact(NumberInput, {
+    events: { onChange: 'number-input:change' },
+})
+```
+
+#### `events` argument
+
+The `events` option maps a Preact-style callback prop to the DOM event the web
+component emits. Preact code doesn't usually listen for custom DOM events,
+and a name with a colon and a hyphen doesn't work well as a JSX prop.
+So the adapter gives you a normal-looking callback prop instead.
+
+```ts
 // server
 import { h } from 'preact'
 import { renderToString } from 'preact-render-to-string'
 
 const body = renderToString(h(App, null))
 ```
+
+#### Hydration with Preact
 
 ```ts
 // browser
@@ -1609,7 +1618,9 @@ reach the element as properties, including after `hydrate`, where
 Preact itself sets no props: the adapter assigns them once the host is
 committed, so a prop-only value or an object arrives too.
 
-**Client-only render.** With no server markup, call Preact's `render`.
+#### Clientside rendering with Preact
+
+With no server markup, call Preact's `render` function.
 On that first render the adapter fills the host with the component's
 inner HTML from its `renderParts` static, before the element connects,
 so the element finds its markup and refs. This needs the variant of

@@ -399,7 +399,12 @@ export class ComponentBuilder<
             })
         }
 
-        if (typeof customElements !== 'undefined') {
+        // A tag that is already registered (the module was loaded twice)
+        // keeps its first class, since define would throw.
+        if (
+            typeof customElements !== 'undefined' &&
+            !customElements.get(this.tagName)
+        ) {
             customElements.define(this.tagName, El)
         }
         return El as unknown as MicrotagElementClass<Props, RefDefs>

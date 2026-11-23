@@ -100,6 +100,26 @@ test('define: registers a working custom element', t => {
     document.body.removeChild(el)
 })
 
+test('define: a second setup for a registered tag does not throw', t => {
+    let runs = 0
+    const First = define('test-define-twice').setup(() => { runs++ })
+    try {
+        define('test-define-twice').setup(() => {})
+        t.ok(true, 'second setup did not throw')
+    } catch (err) {
+        t.fail('second setup threw: ' + String(err))
+    }
+    t.equal(
+        customElements.get('test-define-twice'),
+        First,
+        'the first registration is kept'
+    )
+    const el = document.createElement('test-define-twice')
+    document.body.appendChild(el)
+    t.equal(runs, 1, 'the registered component runs its setup')
+    document.body.removeChild(el)
+})
+
 test('reactive props: reading, writing, and reacting', t => {
     let effectRuns = 0
     let lastValue:number | undefined
