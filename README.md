@@ -18,7 +18,7 @@ This package adds some provisions for serverside rendering.
 
 | Entry | Size (min + brotli) |
 |-------|---------------------|
-| `microtags` | <!-- size -->3.99 KB<!-- /size --> |
+| `microtags` | <!-- size -->4.04 KB<!-- /size --> |
 | `microtags/htm` | <!-- size:htm -->1.99 KB<!-- /size:htm --> |
 | `microtags/preact` | <!-- size:preact -->0.58 KB<!-- /size:preact --> |
 
@@ -77,6 +77,9 @@ This package adds some provisions for serverside rendering.
     + [What escaping does not cover](#what-escaping-does-not-cover)
   * [`microtags/render-support`](#microtagsrender-support)
   * [`microtags/preact`](#microtagspreact)
+    + [`events` argument](#events-argument)
+    + [Hydration with Preact](#hydration-with-preact)
+    + [Clientside rendering with Preact](#clientside-rendering-with-preact)
   * [`microtags/build`](#microtagsbuild)
   * [`microtags/esbuild`](#microtagsesbuild)
   * [`microtags/vite`](#microtagsvite)
