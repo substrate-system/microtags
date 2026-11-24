@@ -28,22 +28,22 @@ earlier tickets' code, fix it here and note it in ADR-012.
 `test/preact-browser.ts`, `src/build.ts` (only if the transform needs
 a fix)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] SSR suite: `render` and `renderParts` of a component with
+- [x] SSR suite: `render` and `renderParts` of a component with
   `.formAssociated()` give exactly the same output as the same
   component without it.
-- [ ] The transform strips the render link from a chain with
+- [x] The transform strips the render link from a chain with
   `.formAssociated()` placed both before and after `.render()`, and
   the transformed module still defines a form-associated component.
-- [ ] Static server HTML for a form-associated host inside a `<form>`,
+- [x] Static server HTML for a form-associated host inside a `<form>`,
   upgraded by defining the component afterwards, contributes its value
   to `FormData` and runs its `reset` handler on `form.reset()`.
-- [ ] A form-associated host adopted by `mount` over server markup
+- [x] A form-associated host adopted by `mount` over server markup
   gets `ctx.internals` and its handlers, and contributes to `FormData`.
-- [ ] An empty form-associated host with a kept render link is filled
+- [x] An empty form-associated host with a kept render link is filled
   from `renderParts`, then gets `ctx.internals` and contributes to
   `FormData`.
-- [ ] A `toPreact`-wrapped form-associated component rendered inside a
+- [x] A `toPreact`-wrapped form-associated component rendered inside a
   `<form>` in the browser contributes to `FormData`.
-- [ ] `npm run gate` passes.
+- [x] `npm run gate` passes.

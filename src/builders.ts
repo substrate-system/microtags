@@ -6,6 +6,7 @@ import type {
     PropType,
     PropertyOnlyProp,
     SetupContext,
+    FormAssociatedContext,
     Coercer,
     RefDef,
     SingleRefDef,
@@ -204,46 +205,48 @@ export type MicrotagElementClass<
  * Fluent builder that accumulates props/refs/contexts config
  * before registering a custom element via `.setup()`.
  */
+interface BuilderConfig {
+    tag:string
+    coercers:Record<string, Coercer<unknown>>
+    observed:string[]
+    propNames:string[]
+    propMetas:Record<string, PropMeta>
+    refDefs:Record<string, RefDef>
+    ctxDefs:Record<string, ContextToken<unknown>>
+    renderFn?:RenderFn<any, any>
+    formAssociated?:boolean
+}
+
 export class ComponentBuilder<
     Props extends Record<string, PropDef> = Record<never, never>,
     RefDefs extends Record<string, RefDef> = Record<never, never>,
-    CtxDefs extends Record<string, ContextToken<unknown>> = Record<never, never>,
+    CtxDefs extends Record<string, ContextToken<unknown>> = (
+        Record<never, never>
+    ),
+    FormAssoc extends boolean = false,
 > {
-    private readonly _coercers:Record<string, Coercer<unknown>>
-    private readonly _observed:string[]
-    private readonly _propNames:string[]
-    private readonly _propMetas:Record<string, PropMeta>
-    private readonly _refDefs:Record<string, RefDef>
-    private readonly _ctxDefs:Record<string, ContextToken<unknown>>
-    private readonly _renderFn?:RenderFn<Props, RefDefs>
+    private readonly _c:BuilderConfig
 
-    constructor (
-        readonly tagName:string,
-        coercers:Record<string, Coercer<unknown>> = {},
-        observed:string[] = [],
-        refDefs:Record<string, RefDef> = {},
-        ctxDefs:Record<string, ContextToken<unknown>> = {},
-        propNames:string[] = [],
-        propMetas:Record<string, PropMeta> = {},
-        renderFn?:RenderFn<any, any>,
-    ) {
-        this._coercers = coercers
-        this._observed = observed
-        this._propNames = propNames
-        this._propMetas = propMetas
-        this._refDefs = refDefs
-        this._ctxDefs = ctxDefs
-        this._renderFn = renderFn as
-            RenderFn<Props, RefDefs> | undefined
+    constructor (cfg:string | BuilderConfig) {
+        this._c = typeof cfg === 'string' ?
+            {
+                tag: cfg,
+                coercers: {},
+                observed: [],
+                propNames: [],
+                propMetas: {},
+                refDefs: {},
+                ctxDefs: {},
+            } :
+            cfg
     }
 
-    /**
-     * The custom element tag name, e.g. 'my-counter'. Available at every
-     * point in the fluent chain since each builder method returns a new
-     * builder carrying the same tag name.
-     */
+    get tagName ():string {
+        return this._c.tag
+    }
+
     get TAG ():string {
-        return this.tagName
+        return this._c.tag
     }
 
     withProps<P extends Record<string, PropDef>> (
@@ -280,63 +283,55 @@ export class ComponentBuilder<
             }
         }
 
-        return new ComponentBuilder<P, RefDefs, CtxDefs>(
-            this.tagName,
+        return new ComponentBuilder<P, RefDefs, CtxDefs, FormAssoc>({
+            ...this._c,
             coercers,
             observed,
-            this._refDefs,
-            this._ctxDefs,
             propNames,
             propMetas,
-        )
+            renderFn: undefined,
+        })
     }
 
     withRefs<R extends Record<string, RefDef>> (
         fn:(r:RefsDSL) => R
-    ):ComponentBuilder<Props, R, CtxDefs> {
+    ):ComponentBuilder<Props, R, CtxDefs, FormAssoc> {
         const defs = fn(refsDSL)
-        return new ComponentBuilder<Props, R, CtxDefs>(
-            this.tagName,
-            this._coercers,
-            this._observed,
-            defs,
-            this._ctxDefs,
-            this._propNames,
-            this._propMetas,
-            this._renderFn,
-        )
+        return new ComponentBuilder<Props, R, CtxDefs, FormAssoc>({
+            ...this._c,
+            refDefs: defs,
+        })
     }
 
     withContexts<C extends Record<string, ContextToken<unknown>>> (
         fn:(c:ContextDSL) => C
-    ):ComponentBuilder<Props, RefDefs, C> {
+    ):ComponentBuilder<Props, RefDefs, C, FormAssoc> {
         const defs = fn(contextDSL)
-        return new ComponentBuilder<Props, RefDefs, C>(
-            this.tagName,
-            this._coercers,
-            this._observed,
-            this._refDefs,
-            defs,
-            this._propNames,
-            this._propMetas,
-            this._renderFn,
-        )
+        return new ComponentBuilder<Props, RefDefs, C, FormAssoc>({
+            ...this._c,
+            ctxDefs: defs,
+        })
+    }
+
+    formAssociated ():ComponentBuilder<
+        Props, RefDefs, CtxDefs, true
+    > {
+        return new ComponentBuilder<
+            Props, RefDefs, CtxDefs, true
+        >({
+            ...this._c,
+            formAssociated: true,
+        })
     }
 
     render (
         fn:RenderFn<Props, RefDefs>,
         _options?:RenderOptions
-    ):ComponentBuilder<Props, RefDefs, CtxDefs> {
-        return new ComponentBuilder<Props, RefDefs, CtxDefs>(
-            this.tagName,
-            this._coercers,
-            this._observed,
-            this._refDefs,
-            this._ctxDefs,
-            this._propNames,
-            this._propMetas,
-            fn,
-        )
+    ):ComponentBuilder<Props, RefDefs, CtxDefs, FormAssoc> {
+        return new ComponentBuilder<Props, RefDefs, CtxDefs, FormAssoc>({
+            ...this._c,
+            renderFn: fn,
+        })
     }
 
     setup (
@@ -344,22 +339,28 @@ export class ComponentBuilder<
             Props,
             RefsMap<RefDefs>,
             ContextsMap<CtxDefs>
-        >) => void
+        > & (
+            FormAssoc extends true ?
+                FormAssociatedContext :
+                unknown
+        )) => void
     ):MicrotagElementClass<Props, RefDefs> {
+        const c = this._c
         const El = factory({
-            props: this._coercers,
-            observedAttrNames: this._observed,
-            refs: this._refDefs,
-            contexts: this._ctxDefs,
+            props: c.coercers,
+            observedAttrNames: c.observed,
+            refs: c.refDefs,
+            contexts: c.ctxDefs,
+            formAssociated: c.formAssociated,
             setup: fn as any,
         })
         Object.defineProperty(El, 'TAG', {
-            value: this.tagName,
+            value: c.tag,
             enumerable: true,
         })
 
         const refNames:Record<string, string> = {}
-        for (const key of Object.keys(this._refDefs)) {
+        for (const key of Object.keys(c.refDefs)) {
             refNames[key] = key
         }
         Object.defineProperty(El, 'refs', {
@@ -368,16 +369,16 @@ export class ComponentBuilder<
         })
 
         Object.defineProperty(El, 'props', {
-            value: Object.freeze([...this._propNames]),
+            value: Object.freeze([...c.propNames]),
             enumerable: true,
         })
 
-        if (this._renderFn) {
+        if (c.renderFn) {
             const rec:RenderRecord = {
-                t: this.tagName,
-                m: this._propMetas,
+                t: c.tag,
+                m: c.propMetas,
                 r: Object.freeze({ ...refNames }),
-                f: this._renderFn,
+                f: c.renderFn,
             }
             // One helper per registry key, so both statics share the
             // lookup and the error.
@@ -403,9 +404,9 @@ export class ComponentBuilder<
         // keeps its first class, since define would throw.
         if (
             typeof customElements !== 'undefined' &&
-            !customElements.get(this.tagName)
+            !customElements.get(c.tag)
         ) {
-            customElements.define(this.tagName, El)
+            customElements.define(c.tag, El)
         }
         return El as unknown as MicrotagElementClass<Props, RefDefs>
     }

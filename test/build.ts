@@ -593,6 +593,42 @@ test('typescript that does not resolve gives the peer message', t => {
         'error says typescript is a missing peer dependency')
 })
 
+// -- form-associated: transform strips render from chains --
+
+test('strip: .formAssociated() before .render() is stripped', t => {
+    const input = `
+import { define } from 'microtags'
+const El = define('my-fa')
+    .formAssociated()
+    .render(() => '<p>hi</p>')
+    .setup(() => {})
+`
+    const result = transform(input)
+    t.ok(!hasRenderInDefineChain(result.code),
+        'no .render() after transform')
+    t.ok(result.code.includes('.formAssociated('),
+        'formAssociated call preserved')
+    t.ok(result.code.includes('.setup('),
+        'setup call preserved')
+})
+
+test('strip: .render() before .formAssociated() is stripped', t => {
+    const input = `
+import { define } from 'microtags'
+const El = define('my-fa2')
+    .render(() => '<p>hi</p>')
+    .formAssociated()
+    .setup(() => {})
+`
+    const result = transform(input)
+    t.ok(!hasRenderInDefineChain(result.code),
+        'no .render() after transform')
+    t.ok(result.code.includes('.formAssociated('),
+        'formAssociated call preserved')
+    t.ok(result.code.includes('.setup('),
+        'setup call preserved')
+})
+
 test('a vite config importing source does not blame typescript', t => {
     const result = spawnSync('npx', [
         'vite', 'build', '--config',

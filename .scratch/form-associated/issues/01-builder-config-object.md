@@ -22,14 +22,14 @@ status to `wontfix` with the measured numbers in a comment, and ticket
 **Touches:** `src/builders.ts` (`ComponentBuilder`, `define`),
 `.size-limit.js` (comment only, if the measurement changes)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Every existing suite passes unchanged: `npm run gate`.
-- [ ] `define(tag).render(fn).withProps(...)` still yields a class with
+- [x] Every existing suite passes unchanged: `npm run gate`.
+- [x] `define(tag).render(fn).withProps(...)` still yields a class with
   no `render` static, as before.
-- [ ] `define(tag).withProps(...).withRefs(...).withContexts(...)
+- [x] `define(tag).withProps(...).withRefs(...).withContexts(...)
   .render(fn)` still yields working `render` and `renderParts` statics
   and the same `TAG`, `refs` and `props` statics as before.
-- [ ] The core entry measured by `size-limit` is the same size or
+- [x] The core entry measured by `size-limit` is the same size or
   smaller than before the change, and the `.size-limit.js` comment
   records the new measurement.

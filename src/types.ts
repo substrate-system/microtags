@@ -217,3 +217,15 @@ export interface SetupContext<
     /** Read an optional context value. */
     consume<T>(token:ContextToken<T>):T | undefined
 }
+
+export interface FormLifecycleHandlers {
+    reset?:() => void
+    disabled?:(isDisabled:boolean) => void
+    restore?:(state:FormData|string|null, mode:string) => void
+    associated?:(form:HTMLFormElement|null) => void
+}
+
+export interface FormAssociatedContext {
+    internals:ElementInternals
+    form(handlers:FormLifecycleHandlers):void
+}

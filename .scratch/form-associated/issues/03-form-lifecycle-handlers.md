@@ -40,29 +40,29 @@ restore replay state), `src/setup-context.ts` (`makeSetupContext`),
 (type exports), `test/index.ts`, `test/types.ts`, `.size-limit.js`,
 `docs/adr/ADR-012-form-associated-components.md`, `README.md`
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `form.reset()` on an enclosing form calls the host's `reset`
+- [x] `form.reset()` on an enclosing form calls the host's `reset`
   handler. A handler that resets the form value makes `FormData` show
   the default again.
-- [ ] Toggling `disabled` on an ancestor `<fieldset>` calls the
+- [x] Toggling `disabled` on an ancestor `<fieldset>` calls the
   `disabled` handler with `true`, then `false`.
-- [ ] Moving the host into a form and then out of it calls the
+- [x] Moving the host into a form and then out of it calls the
   `associated` handler with that form, then `null`.
-- [ ] Calling `host.formStateRestoreCallback(state, mode)` directly
+- [x] Calling `host.formStateRestoreCallback(state, mode)` directly
   calls the `restore` handler with the same `state` and `mode`.
-- [ ] A second `ctx.form()` call replaces the first: only the new
+- [x] A second `ctx.form()` call replaces the first: only the new
   handlers run.
-- [ ] After a host is removed and its teardown has run (await a
+- [x] After a host is removed and its teardown has run (await a
   microtask), `form.reset()` and the other callbacks do not call the
   old handlers.
-- [ ] A `formStateRestoreCallback` that fires before setup has run
+- [x] A `formStateRestoreCallback` that fires before setup has run
   (setup waiting on a missing context) reaches the `restore` handler
   once setup registers it. Only the latest of several early calls is
   delivered.
-- [ ] An early `form.reset()` or fieldset disable before setup has run
+- [x] An early `form.reset()` or fieldset disable before setup has run
   is not replayed to handlers registered later.
-- [ ] Type tests: `ctx.form` exists after `.formAssociated()` and is a
+- [x] Type tests: `ctx.form` exists after `.formAssociated()` and is a
   type error without it. Handler parameter types are as listed above,
   and the handler types are importable from `'microtags'`.
-- [ ] `npm run gate` passes, including `size-limit`.
+- [x] `npm run gate` passes, including `size-limit`.

@@ -3239,4 +3239,590 @@ test('empty host: a server host holding only region markers is adopted',
         box.remove()
     })
 
+// -- form-associated --
+
+test('formAssociated: host contributes to FormData', t => {
+    const form = document.createElement('form')
+    const tag = 'fa-formdata-' + Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="rating"></${tag}>`
+    document.body.appendChild(form)
+
+    define(tag)
+        .formAssociated()
+        .setup(ctx => {
+            ctx.internals.setFormValue('5')
+        })
+
+    const data = new FormData(form)
+    t.equal(data.get('rating'), '5',
+        'value appears in FormData under the name attribute')
+    form.remove()
+})
+
+test('formAssociated: setValidity makes host :invalid', t => {
+    const form = document.createElement('form')
+    const tag = 'fa-validity-' + Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="v"></${tag}>`
+    document.body.appendChild(form)
+
+    let host:HTMLElement|undefined
+    define(tag)
+        .formAssociated()
+        .setup(ctx => {
+            host = ctx.host
+            ctx.internals.setValidity(
+                { valueMissing: true },
+                'required'
+            )
+        })
+
+    t.ok(host!.matches(':invalid'), 'host matches :invalid')
+    t.equal(form.checkValidity(), false,
+        'form.checkValidity returns false')
+
+    // clear validity
+    ;(host as any).constructor.prototype
+    const internals = (host as any)._internals as ElementInternals
+    internals.setValidity({})
+    t.ok(host!.matches(':valid'), 'host matches :valid after clear')
+    t.equal(form.checkValidity(), true,
+        'form.checkValidity returns true after clear')
+    form.remove()
+})
+
+test('formAssociated: host matches :disabled in fieldset', t => {
+    const form = document.createElement('form')
+    const tag = 'fa-disabled-' + Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<fieldset disabled><${tag} name="d"></${tag}></fieldset>`
+    document.body.appendChild(form)
+
+    define(tag)
+        .formAssociated()
+        .setup(() => {})
+
+    const host = form.querySelector(tag)!
+    t.ok(host.matches(':disabled'),
+        'host matches :disabled inside disabled fieldset')
+    form.remove()
+})
+
+test('formAssociated: ctx.internals.form is the enclosing form', t => {
+    const form = document.createElement('form')
+    const tag = 'fa-form-' + Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="f"></${tag}>`
+    document.body.appendChild(form)
+
+    let internals:ElementInternals|undefined
+    define(tag)
+        .formAssociated()
+        .setup(ctx => {
+            internals = ctx.internals
+        })
+
+    t.equal(internals!.form, form,
+        'internals.form points to the enclosing form')
+    form.remove()
+})
+
+test('formAssociated: internals attached once, survives reconnect', async t => {
+    const form = document.createElement('form')
+    const tag = 'fa-reconnect-' + Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="r"></${tag}>`
+    document.body.appendChild(form)
+
+    let setupCount = 0
+    let lastInternals:ElementInternals|undefined
+    define(tag)
+        .formAssociated()
+        .setup(ctx => {
+            setupCount++
+            if (lastInternals) {
+                // same object each time
+                if (ctx.internals !== lastInternals) {
+                    throw new Error('internals changed between setups')
+                }
+            }
+            lastInternals = ctx.internals
+            ctx.internals.setFormValue('v' + setupCount)
+        })
+
+    const host = form.querySelector(tag)!
+    t.equal(setupCount, 1, 'setup ran once')
+
+    // same-tick move: keeps setup
+    const other = document.createElement('div')
+    document.body.appendChild(other)
+    other.appendChild(host)
+    form.appendChild(host)
+    t.equal(setupCount, 1, 'move did not re-run setup')
+
+    // full teardown + reconnect
+    host.remove()
+    await Promise.resolve()
+    form.appendChild(host)
+    t.equal(setupCount, 2, 'reconnect re-ran setup')
+    t.ok(lastInternals, 'internals exist')
+
+    const data = new FormData(form)
+    t.equal(data.get('r'), 'v2', 'value updated after reconnect')
+    form.remove()
+    other.remove()
+})
+
+test('formAssociated: composes with withProps, withRefs, withContexts, render', t => {
+    const form = document.createElement('form')
+    const tag = 'fa-compose-' + Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="c" count="7"><span data-ref="out">hi</span></${tag}>`
+    document.body.appendChild(form)
+
+    let gotRef = false
+    let gotProp = false
+    define(tag)
+        .withProps(p => ({ count: p.number() }))
+        .withRefs(r => ({ out: r.one('span') }))
+        .formAssociated()
+        .setup(ctx => {
+            gotProp = ctx.props.count() === 7
+            gotRef = ctx.refs.out instanceof HTMLSpanElement
+            ctx.internals.setFormValue(String(ctx.props.count()))
+        })
+
+    t.ok(gotProp, 'props resolved')
+    t.ok(gotRef, 'refs resolved')
+    const data = new FormData(form)
+    t.equal(data.get('c'), '7', 'form value set from prop')
+    form.remove()
+})
+
+test('formAssociated: component without it stays unchanged', t => {
+    const form = document.createElement('form')
+    const tag = 'fa-none-' + Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="n"></${tag}>`
+    document.body.appendChild(form)
+
+    define(tag).setup(() => {})
+
+    const data = new FormData(form)
+    t.equal(data.get('n'), null,
+        'non-form-associated host does not appear in FormData')
+
+    const host = form.querySelector(tag)!
+    t.equal(host.matches(':disabled'), false,
+        'non-form-associated host does not match :disabled')
+    form.remove()
+})
+
+// -- form lifecycle handlers --
+
+test('formLifecycle: form.reset() calls reset handler', t => {
+    const form = document.createElement('form')
+    const tag = 'fl-reset-' + Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="v"></${tag}>`
+    document.body.appendChild(form)
+
+    let resetCalled = false
+    define(tag)
+        .formAssociated()
+        .setup(ctx => {
+            ctx.internals.setFormValue('hello')
+            ctx.form({
+                reset: () => {
+                    resetCalled = true
+                    ctx.internals.setFormValue('default')
+                },
+            })
+        })
+
+    const before = new FormData(form)
+    t.equal(before.get('v'), 'hello', 'value before reset')
+    t.equal(resetCalled, false, 'not called before reset')
+    form.reset()
+    t.equal(resetCalled, true, 'reset handler called')
+    const after = new FormData(form)
+    t.equal(after.get('v'), 'default',
+        'FormData shows default after reset')
+    form.remove()
+})
+
+test('formLifecycle: fieldset disabled calls disabled handler',
+    t => {
+        const form = document.createElement('form')
+        const tag = 'fl-dis-' +
+            Math.random().toString(36).slice(2, 8)
+        form.innerHTML = `<fieldset><${tag} name="d"></${tag}>`
+            + '</fieldset>'
+        document.body.appendChild(form)
+
+        const calls:boolean[] = []
+        define(tag)
+            .formAssociated()
+            .setup(ctx => {
+                ctx.form({
+                    disabled: (d) => { calls.push(d) },
+                })
+            })
+
+        const fs = form.querySelector('fieldset')!
+        fs.disabled = true
+        t.deepEqual(calls, [true], 'disabled(true) called')
+        fs.disabled = false
+        t.deepEqual(calls, [true, false],
+            'disabled(false) called')
+        form.remove()
+    })
+
+test('formLifecycle: associated handler on form move', t => {
+    const form = document.createElement('form')
+    const tag = 'fl-assoc-' +
+        Math.random().toString(36).slice(2, 8)
+    const host = document.createElement(tag)
+    host.setAttribute('name', 'a')
+    document.body.appendChild(host)
+    document.body.appendChild(form)
+
+    const calls:(HTMLFormElement|null)[] = []
+    define(tag)
+        .formAssociated()
+        .setup(ctx => {
+            ctx.form({
+                associated: (f) => { calls.push(f) },
+            })
+        })
+
+    // The host is already in the DOM when defined, so the browser
+    // may fire formAssociatedCallback with null during setup (not
+    // in a form). Then moving it into a form fires with that form.
+    form.appendChild(host)
+    t.equal(calls[calls.length - 1], form,
+        'associated called with form')
+    document.body.appendChild(host)
+    t.equal(calls[calls.length - 1], null,
+        'associated called with null')
+    host.remove()
+    form.remove()
+})
+
+test('formLifecycle: restore callback via direct call', t => {
+    const form = document.createElement('form')
+    const tag = 'fl-rest-' +
+        Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="r"></${tag}>`
+    document.body.appendChild(form)
+
+    let restored:[unknown, string]|null = null
+    define(tag)
+        .formAssociated()
+        .setup(ctx => {
+            ctx.form({
+                restore: (state, mode) => {
+                    restored = [state, mode]
+                },
+            })
+        })
+
+    const host = form.querySelector(tag)! as any
+    host.formStateRestoreCallback('saved', 'restore')
+    t.deepEqual(restored, ['saved', 'restore'],
+        'restore handler received state and mode')
+    form.remove()
+})
+
+test('formLifecycle: second ctx.form() replaces first', t => {
+    const form = document.createElement('form')
+    const tag = 'fl-repl-' +
+        Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="rp"></${tag}>`
+    document.body.appendChild(form)
+
+    let first = 0
+    let second = 0
+    define(tag)
+        .formAssociated()
+        .setup(ctx => {
+            ctx.form({ reset: () => { first++ } })
+            ctx.form({ reset: () => { second++ } })
+        })
+
+    form.reset()
+    t.equal(first, 0, 'first handler not called')
+    t.equal(second, 1, 'second handler called')
+    form.remove()
+})
+
+test('formLifecycle: handlers dropped after teardown',
+    async t => {
+        const form = document.createElement('form')
+        const tag = 'fl-tear-' +
+            Math.random().toString(36).slice(2, 8)
+        form.innerHTML = `<${tag} name="td"></${tag}>`
+        document.body.appendChild(form)
+
+        let resets = 0
+        define(tag)
+            .formAssociated()
+            .setup(ctx => {
+                ctx.form({ reset: () => { resets++ } })
+            })
+
+        form.reset()
+        t.equal(resets, 1, 'handler called while connected')
+
+        const host = form.querySelector(tag)!
+        host.remove()
+        await Promise.resolve()
+
+        // The host's teardown ran; calling the callback directly
+        // should not call the old handler.
+        ;(host as any).formResetCallback?.()
+        t.equal(resets, 1, 'handler not called after teardown')
+        form.remove()
+    })
+
+test('formLifecycle: restore replayed when handler registers' +
+    ' late', t => {
+    const form = document.createElement('form')
+    const tag = 'fl-replay-' +
+        Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="rpl"></${tag}>`
+    document.body.appendChild(form)
+
+    let restored:[unknown, string]|null = null
+    const host = form.querySelector(tag)! as any
+
+    const token = createContext<number>()
+
+    define(tag)
+        .formAssociated()
+        .withContexts(() => ({ c: token }))
+        .setup(ctx => {
+            ctx.form({
+                restore: (state, mode) => {
+                    restored = [state, mode]
+                },
+            })
+        })
+
+    // Setup has not run because the context is missing.
+    host.formStateRestoreCallback('early', 'restore')
+    t.equal(restored, null,
+        'restore not delivered before setup')
+
+    // Provide the context so setup runs.
+    provide(form, token, 42)
+    t.deepEqual(restored, ['early', 'restore'],
+        'pending restore replayed')
+    form.remove()
+})
+
+test('formLifecycle: early reset/disabled not replayed', t => {
+    const form = document.createElement('form')
+    const tag = 'fl-norepl-' +
+        Math.random().toString(36).slice(2, 8)
+    form.innerHTML = `<${tag} name="nr"></${tag}>`
+    document.body.appendChild(form)
+
+    const host = form.querySelector(tag)! as any
+    const token = createContext<number>()
+
+    let resets = 0
+    const disabledCalls:boolean[] = []
+
+    define(tag)
+        .formAssociated()
+        .withContexts(() => ({ c: token }))
+        .setup(ctx => {
+            ctx.form({
+                reset: () => { resets++ },
+                disabled: (d) => { disabledCalls.push(d) },
+            })
+        })
+
+    // Setup has not run (context missing). Fire callbacks early.
+    host.formResetCallback()
+    host.formDisabledCallback(true)
+
+    // Now provide the context so setup runs.
+    provide(form, token, 1)
+
+    // The early reset and disabled should NOT have been replayed.
+    t.equal(resets, 0,
+        'early reset not replayed')
+    t.deepEqual(disabledCalls, [],
+        'early disabled not replayed')
+    form.remove()
+})
+
+test('formLifecycle: pending restore cleared on teardown',
+    async t => {
+        const form = document.createElement('form')
+        const tag = 'fl-fp-clear-' +
+            Math.random().toString(36).slice(2, 8)
+        form.innerHTML = `<${tag} name="fp"></${tag}>`
+        document.body.appendChild(form)
+
+        const host = form.querySelector(tag)! as any
+        const token = createContext<number>()
+        const restores:[unknown, string][] = []
+
+        define(tag)
+            .formAssociated()
+            .withContexts(() => ({ c: token }))
+            .setup(ctx => {
+                ctx.form({
+                    restore: (state, mode) => {
+                        restores.push([state, mode])
+                    },
+                })
+            })
+
+        // Fire restore before setup (context missing).
+        host.formStateRestoreCallback('old', 'restore')
+        t.deepEqual(restores, [],
+            'restore not delivered before setup')
+
+        // Disconnect before setup ever ran (context never provided).
+        host.remove()
+        await Promise.resolve()
+
+        // Reconnect; now provide context so setup runs.
+        form.appendChild(host)
+        provide(form, token, 1)
+        t.deepEqual(restores, [],
+            'stale restore NOT replayed on reconnect')
+
+        form.remove()
+    })
+
+// -- form-associated: server render and hydration --
+
+test('formAssociated SSR: static HTML upgrade contributes to FormData', t => {
+    const tag = 'fa-ssr-upgrade-' +
+        Math.random().toString(36).slice(2, 8)
+    const form = document.createElement('form')
+    form.innerHTML =
+        `<${tag} name="rating"><span>5</span></${tag}>`
+    document.body.appendChild(form)
+
+    define(tag)
+        .withProps(p => ({ val: p.string() }))
+        .formAssociated()
+        .render(({ props }) =>
+            bhtml`<span>${props.val}</span>`)
+        .setup(ctx => {
+            ctx.internals.setFormValue('5')
+        })
+
+    const data = new FormData(form)
+    t.equal(data.get('rating'), '5',
+        'upgraded host contributes to FormData')
+    form.remove()
+})
+
+test('formAssociated SSR: static HTML upgrade runs reset handler', t => {
+    const tag = 'fa-ssr-reset-' +
+        Math.random().toString(36).slice(2, 8)
+    const form = document.createElement('form')
+    form.innerHTML =
+        `<${tag} name="r"><span>x</span></${tag}>`
+    document.body.appendChild(form)
+
+    let resets = 0
+    let currentVal = 'edited'
+    define(tag)
+        .withProps(p => ({ val: p.string() }))
+        .formAssociated()
+        .render(({ props }) =>
+            bhtml`<span>${props.val}</span>`)
+        .setup(ctx => {
+            ctx.internals.setFormValue(currentVal)
+            ctx.form({
+                reset () {
+                    resets++
+                    currentVal = 'default'
+                    ctx.internals.setFormValue('default')
+                },
+            })
+        })
+
+    t.equal(
+        new FormData(form).get('r'), 'edited',
+        'before reset, value is edited'
+    )
+
+    form.reset()
+    t.equal(resets, 1, 'reset handler called once')
+    t.equal(
+        new FormData(form).get('r'), 'default',
+        'after reset, value is default'
+    )
+    form.remove()
+})
+
+test('formAssociated SSR: mount adoption gets internals and FormData', t => {
+    const tag = 'fa-ssr-adopt-' +
+        Math.random().toString(36).slice(2, 8)
+
+    let gotInternals:ElementInternals|undefined
+    const El = define(tag)
+        .withProps(p => ({ val: p.string() }))
+        .formAssociated()
+        .render(({ props }) =>
+            bhtml`<span>${props.val}</span>`)
+        .setup(ctx => {
+            gotInternals = ctx.internals
+            ctx.internals.setFormValue(ctx.props.val())
+        })
+
+    const form = document.createElement('form')
+    form.innerHTML =
+        `<${tag} name="adopted" val="hi">` +
+        `<span>hi</span></${tag}>`
+    document.body.appendChild(form)
+    const host = form.querySelector(tag)!
+
+    const val = signal('hi')
+    mount(form, bhtml`<${El} name="adopted" val=${val} />`)
+
+    t.ok(gotInternals, 'ctx.internals is present')
+    t.equal(
+        new FormData(form).get('adopted'), 'hi',
+        'adopted host contributes to FormData'
+    )
+
+    t.equal(form.querySelector(tag), host,
+        'same host node was adopted')
+    form.remove()
+})
+
+test('formAssociated SSR: empty host with render link gets internals and FormData', t => {
+    const tag = 'fa-ssr-empty-' +
+        Math.random().toString(36).slice(2, 8)
+
+    let gotInternals:ElementInternals|undefined
+    define(tag)
+        .withProps(p => ({ val: p.string() }))
+        .formAssociated()
+        .render(({ props }) =>
+            bhtml`<span>${props.val}</span>`)
+        .setup(ctx => {
+            gotInternals = ctx.internals
+            ctx.internals.setFormValue(ctx.props.val())
+        })
+
+    const form = document.createElement('form')
+    form.innerHTML = `<${tag} name="empty" val="ok"></${tag}>`
+    document.body.appendChild(form)
+
+    const host = form.querySelector(tag)!
+    t.ok(host.querySelector('span'),
+        'empty host was filled from renderParts')
+    t.ok(gotInternals,
+        'ctx.internals is present on empty host')
+    t.equal(
+        new FormData(form).get('empty'), 'ok',
+        'empty host contributes to FormData'
+    )
+    form.remove()
+})
+
 import './preact-browser.js'

@@ -7,6 +7,7 @@ import type {
     PropDef,
     ContextToken,
     BindOptions,
+    FormLifecycleHandlers,
 } from './types.js'
 
 /**
@@ -21,9 +22,10 @@ export function makeSetupContext<
     props:PropsSignals<Props>,
     refs:Record<string, Element | Element[]>,
     contexts:Record<string, unknown>,
-    cleanups:(() => void)[]
+    cleanups:(() => void)[],
+    internals?:ElementInternals
 ):SetupContext<Props, any, any> {
-    return {
+    const ctx:SetupContext<Props, any, any> = {
         host,
         props,
         refs,
@@ -116,4 +118,17 @@ export function makeSetupContext<
             return sig ? sig() : undefined
         },
     }
+    if (internals) {
+        const el = host as any
+        ;(ctx as any).internals = internals
+        ;(ctx as any).form = (h:FormLifecycleHandlers) => {
+            el._fh = h
+            if (el._fp && h.restore) {
+                const [s, m] = el._fp
+                el._fp = undefined
+                h.restore(s as FormData|string|null, m)
+            }
+        }
+    }
+    return ctx
 }

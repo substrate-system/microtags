@@ -25,7 +25,7 @@ _Avoid_: pipeline, config
 
 **Link**:
 One call in the builder chain: `withProps`, `withRefs`, `withContexts`,
-or `render`. `setup` is the terminal link.
+`formAssociated`, or `render`. `setup` is the terminal link.
 _Avoid_: step, method (in prose)
 
 **Prop**:

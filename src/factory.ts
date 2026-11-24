@@ -12,6 +12,7 @@ import type {
     Coercer,
     ContextToken,
     RefDef,
+    FormLifecycleHandlers,
 } from './types.js'
 
 /**
@@ -41,6 +42,8 @@ export interface FactoryConfig<Props extends FactoryProps = FactoryProps> {
     refs?:Record<string, RefDef>
     /** Context tokens keyed by name. */
     contexts?:Record<string, ContextToken<unknown>>
+    /** Make the host a form-associated custom element. */
+    formAssociated?:boolean
     /** Setup callback receiving the component context. */
     setup:(ctx:SetupContext<Props, any, any>) => void
 }
@@ -90,6 +93,7 @@ export function factory<Props extends FactoryProps = FactoryProps> (
         setup,
         refs: refDefs = {},
         contexts: ctxDefs = {},
+        formAssociated: isFormAssociated,
     } = config
 
     class MicrotagElement extends HTMLElementBase {
@@ -101,9 +105,15 @@ export function factory<Props extends FactoryProps = FactoryProps> (
         _cleanups:(() => void)[] = []
         // Connected and set up, not yet torn down.
         _live = false
+        _internals:ElementInternals|undefined
+        _fh:FormLifecycleHandlers|undefined
+        _fp:[unknown, string]|undefined
 
         constructor () {
             super()
+            if (isFormAssociated) {
+                this._internals = this.attachInternals()
+            }
             for (const [name, coercer] of Object.entries(propDefs)) {
                 const own = signal(coercer(null))
                 const bound = signal<Signal<unknown>|undefined>(undefined)
@@ -193,7 +203,8 @@ export function factory<Props extends FactoryProps = FactoryProps> (
 
                 const refs = collectRefs(this, refDefs)
                 const ctx = makeSetupContext(
-                    this, props, refs, contexts, cleanups
+                    this, props, refs, contexts, cleanups,
+                    this._internals
                 )
                 setup(ctx)
             }
@@ -245,12 +256,41 @@ export function factory<Props extends FactoryProps = FactoryProps> (
             queueMicrotask(() => {
                 if (this.isConnected || !this._live) return
                 this._live = false
+                this._fh = undefined
+                this._fp = undefined
                 // Snapshot and clear BEFORE running so re-entrant calls
                 // are safe and the array is empty after this throws.
                 const fns = this._cleanups
                 this._cleanups = []
                 runAll(fns)
             })
+        }
+    }
+
+    if (isFormAssociated) {
+        Object.defineProperty(MicrotagElement, 'formAssociated', {
+            value: true,
+        })
+        const p = MicrotagElement.prototype as any
+        p.formResetCallback = function () {
+            this._fh?.reset?.()
+        }
+        p.formDisabledCallback = function (d:boolean) {
+            this._fh?.disabled?.(d)
+        }
+        p.formAssociatedCallback = function (
+            f:HTMLFormElement|null
+        ) {
+            this._fh?.associated?.(f)
+        }
+        p.formStateRestoreCallback = function (
+            s:unknown, m:string
+        ) {
+            if (this._fh?.restore) {
+                this._fh.restore(s as FormData|string|null, m)
+            } else {
+                this._fp = [s, m]
+            }
         }
     }
 

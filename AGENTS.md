@@ -518,6 +518,32 @@ tapout run, so tests for it capture the queued task with the
 `insertBefore` fallback in Chromium, set `moveBefore` to `undefined` on
 the parent instance.
 
+### Form-associated components (`src/builders.ts`, `src/factory.ts`, ADR-012)
+
+`.formAssociated()` in the builder chain sets a `formAssociated` flag
+on `BuilderConfig`. The factory reads it, defines `static
+formAssociated = true` on the class (before `customElements.define`),
+and calls `attachInternals()` once in the constructor. The
+`ElementInternals` is stored on `_internals` and reused across
+reconnect cycles. `makeSetupContext` receives it as an optional
+parameter and attaches it to the context object only when present.
+
+The `ComponentBuilder` carries a `FormAssoc` type parameter
+(default `false`). The setup callback's context type is intersected
+with `FormAssociatedContext` when `FormAssoc` is `true`, so
+`ctx.internals` is a type error without the opt-in.
+
+`ctx.form(handlers)` registers handlers for `formResetCallback`,
+`formDisabledCallback`, `formStateRestoreCallback` and
+`formAssociatedCallback`. Handlers are stored on instance properties
+`_fh` (the handlers object) and `_fp` (a pending restore tuple).
+The prototype callbacks are defined with `function` (not arrow) so
+`this` refers to the host. Handlers are cleared in teardown by
+setting `_fh = undefined`. A `restore` callback received before
+`ctx.form()` is stored in `_fp` and replayed when the handler
+registers; `reset`, `disabled` and `associated` are not replayed.
+`FormLifecycleHandlers` is a public type export from `microtags`.
+
 <!-- redeye:start -->
 ## Agent skills
 

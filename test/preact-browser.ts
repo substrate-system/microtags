@@ -117,6 +117,32 @@ test('preact browser: a mapped callback is called on the event', t => {
     client.remove()
 })
 
+// -- form-associated: toPreact in a form --
+
+const FAEl = define('preact-fa-el')
+    .withProps(p => ({ val: p.string() }))
+    .formAssociated()
+    .render(({ props }) => html`<span>${props.val}</span>`)
+    .setup(ctx => {
+        ctx.internals.setFormValue(ctx.props.val())
+    })
+
+const FAC = toPreact(FAEl)
+
+test('preact browser: form-associated toPreact contributes to FormData', t => {
+    const form = document.createElement('form')
+    document.body.appendChild(form)
+    render(h(FAC, { val: 'hello' }), form)
+    const host = form.querySelector('preact-fa-el')!
+    host.setAttribute('name', 'fa-preact')
+    t.ok(host, 'the form-associated host was created')
+    const data = new FormData(form)
+    t.equal(data.get('fa-preact'), 'hello',
+        'form-associated host contributes to FormData')
+    render(null, form)
+    form.remove()
+})
+
 test('preact browser: children throw, naming the tag', t => {
     const div = container()
     let err:Error|null = null

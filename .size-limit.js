@@ -8,9 +8,12 @@ export default [
         // renderParts static; 4.06 kB with an empty host rendered
         // through a kept render link (ADR-011); 4.03 kB with comments
         // counted as content; 4.04 kB skipping define for a tag that
-        // is already registered, rounded up to the next
-        // 0.05 kB
-        limit: '4.1 kB',
+        // is already registered; 4.04 kB after builder config object
+        // refactor (positional args -> single config); 4.09 kB with
+        // form-associated custom element support (ADR-012); 4.23 kB
+        // with form lifecycle handlers (ctx.form), rounded up to the
+        // next 0.05 kB
+        limit: '4.25 kB',
     },
     {
         name: 'microtags/htm',

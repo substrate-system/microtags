@@ -11,6 +11,7 @@ import type {
     Signal as PublicSignal,
     Serialized as PublicSerialized,
     RenderParts as PublicRenderParts,
+    FormLifecycleHandlers as PublicFormLifecycleHandlers,
 } from 'microtags'
 import { bindProp } from 'microtags'
 import { signal, computed } from 'alien-signals'
@@ -229,6 +230,52 @@ type _serializedShallow = Expect<Equal<
         outer:{ inner:PublicSignal<number> };
         plain:{ inner:PublicSignal<string> };
     }
+>>
+
+// formAssociated: ctx.internals is ElementInternals after opt-in.
+define('mt-fa-types')
+    .formAssociated()
+    .setup(ctx => {
+        expectAssignable<ElementInternals>(ctx.internals)
+    })
+
+// formAssociated: ctx.internals is a type error without opt-in.
+define('mt-fa-no-types')
+    // @ts-expect-error: internals not available without formAssociated
+    .setup(ctx => { ctx.internals })
+
+// formAssociated: composes with all other links.
+define('mt-fa-compose-types')
+    .withProps(p => ({ count: p.number() }))
+    .withRefs(r => ({ out: r.one() }))
+    .formAssociated()
+    .setup(ctx => {
+        expectAssignable<ElementInternals>(ctx.internals)
+        expectAssignable<number>(ctx.props.count())
+        expectAssignable<HTMLElement>(ctx.refs.out)
+    })
+
+// formAssociated: ctx.form exists after opt-in.
+define('mt-fa-form-types')
+    .formAssociated()
+    .setup(ctx => {
+        ctx.form({
+            reset: () => {},
+            disabled: (_d:boolean) => {},
+            restore: (_s, _m) => {},
+            associated: (_f) => {},
+        })
+    })
+
+// formAssociated: ctx.form is a type error without opt-in.
+define('mt-fa-no-form-types')
+    // @ts-expect-error: form not available without formAssociated
+    .setup(ctx => { ctx.form })
+
+// FormLifecycleHandlers is importable from 'microtags'.
+type _flhExists = Expect<Equal<
+    keyof PublicFormLifecycleHandlers,
+    'reset' | 'disabled' | 'restore' | 'associated'
 >>
 
 // microtags/preact: the adapter's props are typed from the class.

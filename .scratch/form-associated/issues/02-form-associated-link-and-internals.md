@@ -44,30 +44,30 @@ Document the link in the README API section and add it to the
 `docs/adr/ADR-012-form-associated-components.md`, `docs/adr/INDEX.md`,
 `README.md`, `CONTEXT.md`
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A host of a component built with `.formAssociated()` inside a
+- [x] A host of a component built with `.formAssociated()` inside a
   real `<form>` contributes the value set with
   `ctx.internals.setFormValue` to `new FormData(form)` under its
   `name` attribute.
-- [ ] `ctx.internals.setValidity` with a failing flag makes the host
+- [x] `ctx.internals.setValidity` with a failing flag makes the host
   match `:invalid` and makes `form.checkValidity()` return false.
   Clearing it restores both.
-- [ ] A host inside a `<fieldset disabled>` matches `:disabled`.
-- [ ] `ctx.internals.form` is the enclosing form element.
-- [ ] Internals are attached once per host. Disconnecting and
+- [x] A host inside a `<fieldset disabled>` matches `:disabled`.
+- [x] `ctx.internals.form` is the enclosing form element.
+- [x] Internals are attached once per host. Disconnecting and
   reconnecting the host (both a same-tick move and a full teardown
   followed by a reconnect) re-runs setup without an "already
   attached" error, and setup sees the same `internals` object each
   time.
-- [ ] `.formAssociated()` works in each position of a chain that also
+- [x] `.formAssociated()` works in each position of a chain that also
   uses `withProps`, `withRefs`, `withContexts` and `render`. Props,
   refs and contexts still resolve, and `render` still produces the
   same output.
-- [ ] A component built without `.formAssociated()` does not appear in
+- [x] A component built without `.formAssociated()` does not appear in
   `FormData` and does not match `:disabled` inside a disabled
   fieldset, as today.
-- [ ] Type tests: `ctx.internals` is `ElementInternals` after
+- [x] Type tests: `ctx.internals` is `ElementInternals` after
   `.formAssociated()` and is a type error without it.
-- [ ] `npm run gate` passes, including `size-limit` with the raised
+- [x] `npm run gate` passes, including `size-limit` with the raised
   limit.

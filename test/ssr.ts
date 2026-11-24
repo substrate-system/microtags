@@ -869,3 +869,57 @@ test('parity table: server output matches the expected HTML', t => {
         )
     }
 })
+
+// -- form-associated: server render --
+
+test('SSR: formAssociated does not change render output', t => {
+    const renderFn = ({ props }:any) =>
+        `<input value="${props.val}" />`
+
+    const Plain = define('ssr-fa-plain')
+        .withProps(p => ({ val: p.string() }))
+        .render(renderFn)
+        .setup(() => {})
+
+    const FA = define('ssr-fa-opted')
+        .withProps(p => ({ val: p.string() }))
+        .formAssociated()
+        .render(renderFn)
+        .setup(() => {})
+
+    const plainOut = Plain.render({ val: 'hello' })
+    const faOut = FA.render({ val: 'hello' })
+
+    // The only difference should be the host tag name
+    const normalize = (s:string) =>
+        s.replace(/ssr-fa-(plain|opted)/g, 'ssr-fa-X')
+    t.equal(normalize(faOut), normalize(plainOut),
+        'render output is identical apart from tag name')
+})
+
+test('SSR: formAssociated does not change renderParts output', t => {
+    const renderFn = ({ props }:any) =>
+        `<span>${props.n}</span>`
+
+    const Plain = define('ssr-fa-parts-plain')
+        .withProps(p => ({ n: p.number() }))
+        .render(renderFn)
+        .setup(() => {})
+
+    const FA = define('ssr-fa-parts-opted')
+        .withProps(p => ({ n: p.number() }))
+        .formAssociated()
+        .render(renderFn)
+        .setup(() => {})
+
+    const plainParts = Plain.renderParts({ n: 42 })
+    const faParts = FA.renderParts({ n: 42 })
+
+    t.equal(
+        JSON.stringify(plainParts.attrs),
+        JSON.stringify(faParts.attrs),
+        'attrs are identical'
+    )
+    t.equal(plainParts.html, faParts.html,
+        'inner html is identical')
+})

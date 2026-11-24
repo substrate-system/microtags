@@ -51,6 +51,7 @@ This package adds some provisions for serverside rendering.
   * [`builder.withRefs(fn)`](#builderwithrefsfn)
   * [`builder.withContexts`](#builderwithcontexts)
     + [`.withContexts` Example](#withcontexts-example)
+  * [`builder.formAssociated()`](#builderformassociated)
   * [`builder.render(fn, options?)`](#builderrenderfn-options)
   * [`builder.setup(ctx)`](#buildersetupctx)
     + [`ctx`](#ctx)
@@ -556,11 +557,13 @@ The object returned by [`define`](#define). Includes methods:
 | `.withProps(fn)` | `ComponentBuilder` | Declare reactive attributes. See [Props](#props). |
 | `.withRefs(fn)` | `ComponentBuilder` | Declare DOM refs resolved once the element connects. See [Refs](#refs-1). |
 | `.withContexts(fn)` | `ComponentBuilder` | Consume context values published by an ancestor. See [`withContexts`](#withcontexts). |
+| `.formAssociated()` | `ComponentBuilder` | Make hosts form-associated custom elements. See [`.formAssociated`](#builderformassociated). |
 | `.render(fn, opts?)` | `ComponentBuilder` | Attach a server-render function. See [`.render`](#builderrenderfn-options) below. Not to be confused with the DOM helper [`microtags/render`](#microtagsrender). |
 | `.setup(fn)` | `MicrotagElementClass` | Registers the custom element and returns its class. See [`setup`](#setup) below. |
 
-Methods `withProps`, `withRefs`, and `withContexts` each return a new builder,
-so they chain in any order; `setup` ends the chain by registering the element.
+Methods `withProps`, `withRefs`, `withContexts` and `formAssociated` each
+return a new builder, so they chain in any order; `setup` ends the chain by
+registering the element.
 
 ---------------------------------------------------------
 
@@ -778,6 +781,68 @@ define('themed-card')
 
 ---------------------------------------------------------
 
+### `builder.formAssociated()`
+
+Make hosts of this component form-associated custom elements. The host
+gets an `ElementInternals` object, available in setup as
+`ctx.internals`. With it the component can call `setFormValue`,
+`setValidity`, set ARIA defaults, and participate in the containing
+form.
+
+```ts
+class ComponentBuilder {
+    formAssociated ():ComponentBuilder<
+        Props, RefDefs, CtxDefs, true
+    >
+}
+```
+
+A form-associated host:
+
+- contributes a value to `FormData` under its `name` attribute
+- takes part in constraint validation (`:valid` / `:invalid`)
+- follows `disabled` from an ancestor `<fieldset>`
+- exposes `ctx.internals.form` as the enclosing form
+
+```ts
+const RatingInput = define('rating-input')
+    .withProps(p => ({ value: p.number() }))
+    .formAssociated()
+    .setup(ctx => {
+        ctx.internals.role = 'slider'
+        ctx.effect(() => {
+            ctx.internals.setFormValue(
+                String(ctx.props.value())
+            )
+        })
+    })
+```
+
+#### `ctx.form(handlers)`
+
+Register handlers for the form lifecycle callbacks. All four are
+optional:
+
+```ts
+ctx.form({
+    reset () { /* form was reset */ },
+    disabled (isDisabled) { /* fieldset toggled */ },
+    restore (state, mode) { /* autocomplete / back-forward */ },
+    associated (form) { /* moved into or out of a form */ },
+})
+```
+
+Calling `ctx.form()` again replaces the earlier handlers. Handlers
+are dropped when the host tears down. A `restore` callback that fires
+before setup has registered a handler is replayed once the handler is
+set; `reset`, `disabled` and `associated` are not replayed because
+their state is readable at setup time (`host.matches(':disabled')`,
+`ctx.internals.form`).
+
+Components that do not call `.formAssociated()` behave exactly as
+before and do not appear in `FormData`.
+
+---------------------------------------------------------
 
 ### `builder.render(fn, options?)`
 
