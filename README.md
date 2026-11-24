@@ -52,6 +52,7 @@ This package adds some provisions for serverside rendering.
   * [`builder.withContexts`](#builderwithcontexts)
     + [`.withContexts` Example](#withcontexts-example)
   * [`builder.formAssociated()`](#builderformassociated)
+    + [`ctx.form(handlers)`](#ctxformhandlers)
   * [`builder.render(fn, options?)`](#builderrenderfn-options)
   * [`builder.setup(ctx)`](#buildersetupctx)
     + [`ctx`](#ctx)
